@@ -6,6 +6,7 @@
 #include "log.h"
 #include "dump.h"
 #include "html.h"
+#include "tex.h"
 
 
 #define dL Diff(node->left)
@@ -27,9 +28,18 @@
 
 #define NEW_OP_NODE(OP, nodeL, nodeR) CreateNode(OP_TYPE, OP, 0, NULL, nodeL, nodeR)
 
-#define IS_OP node->value->type == OP_TYPE
+#define VAL(val) CreateNode(VAL_TYPE, -1, val, NULL, NULL, NULL)
+
+#define IS_OP  node->value->type == OP_TYPE
+#define IS_VAL node->value->type == VAL_TYPE
+#define IS_VAR node->value->type == VAR_TYPE 
+
 #define IS_UN (node->value->op >= OP_SIN && node->value->op <= OP_CTG) 
-#define CUR_OP node->value->op
+
+#define CUR_OP   node->value->op
+#define CUR_VAL  node->value->dbl
+#define CUR_VAR  node->value->varValue
+#define CUR_TYPE node->value->type
 
 #define R_VAL node->right->value->dbl
 #define L_VAL node->left->value->dbl
@@ -83,6 +93,10 @@ double CalculateValue(int OP, double val1, double val2);
 void replaceNodes(struct node* node, struct node* newNode);
 
 int CalcTreeHeight(struct node* node, int curHeight);
+void PrintTex(struct node* node);
+
+void recursTex(struct node* node);
+
 
 static size_t imageNum = 1;
 
@@ -104,8 +118,7 @@ enum Types
     VAR_TYPE
 };
 
-enum Op_types
-{
+enum Op_types {
     OP_ADD,
     OP_SUB,
     OP_MUL,
@@ -117,8 +130,7 @@ enum Op_types
     OP_CTG
 };
 
-struct DiffNode
-{
+struct DiffNode {
     int        type;
     double      dbl;
     int          op;
@@ -151,8 +163,99 @@ int main() {
     GraphTreeDump(differentiated);
     printf("done diff opt graph dump\n");
 
+    printf("\ntrying to teeeeeex\n");
+    PrintTex(differentiated);
+    printf("tex doooooooooone\n");
+
     TreeDtor(&tree);
     printf("done dtoring tree\n");
+}
+
+void recursTex(struct node* node) {
+
+    if (IS_OP) {
+        switch (CUR_OP)
+        {
+        case OP_ADD:
+            recursTex(node->left);
+            texPr("+");
+            recursTex(node->right);
+            break;
+        
+        case OP_SUB:
+            recursTex(node->left);
+            texPr("-");
+            recursTex(node->right);
+            break;
+
+        case OP_MUL:
+            recursTex(node->left);
+            texPr("\\cdot ");
+            recursTex(node->right);
+            break;
+
+        case OP_DEG:
+            recursTex(node->left);
+            texPr("^{");
+            recursTex(node->right);
+            texPr("}");
+            break;
+
+        case OP_DIV:
+            texPr("\\frac{");
+            recursTex(node->left);
+            texPr("}{");
+            recursTex(node->right);
+            texPr("}");
+            break;
+
+        case OP_SIN:
+            texPr("\\sin{");
+            if (node->left->left)
+                texPr("(");
+            recursTex(node->left);
+            if (node->left->left)
+                texPr(")");
+            texPr("}");
+            break;
+
+        case OP_COS:
+            texPr("\\cos{");
+            recursTex(node->left);
+            texPr("}");
+            break;
+
+        case OP_TG:
+            texPr("\\tg{");
+            recursTex(node->left);
+            texPr("}");
+            break;
+
+        case OP_CTG:
+            texPr("\\ctg{");
+            recursTex(node->left);
+            texPr("}");
+            break;
+        }
+    } else if (IS_VAL) {
+        texPr("%.1lf", CUR_VAL);
+    } else if (IS_VAR) {
+        texPr("%s", CUR_VAR);
+    }
+}
+
+void PrintTex(struct node* node) {
+    texFile = openTex();
+
+    logprint("trying to recurs tex\n");
+
+    texPr("$");
+    recursTex(node);
+    texPr("$");
+
+    logprint("done recurs tex\n");
+
+    CloseTex(texFile);
 
 }
 
@@ -242,7 +345,7 @@ void RecursiveOptimize(struct node* node) {
 }
 
 struct node* Diff(const struct node* node) {
-    switch (node->value->type) {
+    switch (CUR_TYPE) {
     case VAL_TYPE:
         return CreateNode(VAL_TYPE, -1, 0.0, NULL, NULL, NULL);
 
@@ -252,6 +355,7 @@ struct node* Diff(const struct node* node) {
     case OP_TYPE:
 
         switch (CUR_OP) {
+
         case OP_ADD:
             return ADD(dL, dR);
 
@@ -262,40 +366,25 @@ struct node* Diff(const struct node* node) {
             return ADD(MUL(dL, cR), MUL(cL, dR));
 
         case OP_DIV:
-            return DIV(SUB(MUL(dL, cR), MUL(cL, dR)), MUL(cR, cR));
+            return DIV(SUB(MUL(dL, cR), MUL(cL, dR)), DEG(cR, VAL(2.0)));
 
         case OP_DEG:
-            if (R_TYPE == VAL_TYPE) {                    //case (f(x))^num
-                struct node* degreeNode = CreateNode(VAL_TYPE, 0, R_VAL, NULL, NULL, NULL);
-                struct node* reducedDegreeNode = CreateNode(VAL_TYPE, 0, R_VAL-1, NULL, NULL, NULL);
-                return MUL(MUL(degreeNode, DEG(cL, reducedDegreeNode)), dL); 
-            } else if (L_TYPE == VAL_TYPE) {              //case num^(f(x))
-                struct node* logNode = CreateNode(VAL_TYPE, 0, log(L_VAL), NULL, NULL, NULL);
-                return MUL(MUL(DEG(cL, cR), logNode), dR);
-            }
+            if (R_TYPE == VAL_TYPE)                     //case (f(x))^num
+                return MUL(MUL(VAL(R_VAL), DEG(cL, VAL(R_VAL-1))), dL); 
+            else if (L_TYPE == VAL_TYPE)                //case num^(f(x))
+                return MUL(MUL(DEG(cL, cR), VAL(log(L_VAL))), dR);
+    
         case OP_SIN:
             return MUL(COS(cL), dL);
 
         case OP_COS:
-        {
-            struct node* minus = CreateNode(VAL_TYPE, 0, -1.0, NULL, NULL, NULL);
-            return MUL(minus, MUL(SIN(cL), dL));
-        }
+            return MUL(VAL(-1.0), MUL(SIN(cL), dL));
 
         case OP_TG:
-        {
-            struct node* one = CreateNode(VAL_TYPE, 0, 1.0, NULL, NULL, NULL);
-            struct node* two = CreateNode(VAL_TYPE, 0, 2.0, NULL, NULL, NULL);
-            return MUL(DIV(one, DEG(COS(cL), two)), dL);
-        }
-
+            return MUL(DIV(VAL(1.0), DEG(COS(cL), VAL(2.0))), dL);
+        
         case OP_CTG:
-        {
-            struct node* minus = CreateNode(VAL_TYPE, 0, -1.0, NULL, NULL, NULL);
-            struct node* one = CreateNode(VAL_TYPE, 0, 1.0, NULL, NULL, NULL);
-            struct node* two = CreateNode(VAL_TYPE, 0, 2.0, NULL, NULL, NULL);
-            return MUL(minus, MUL(DIV(one, DEG(SIN(cL), two)), dL));
-        }
+            return MUL(VAL(-1.0), MUL(DIV(VAL(1.0), DEG(SIN(cL), VAL(2.0))), dL));
         }
     break;
     }
@@ -395,13 +484,13 @@ void DrawTree(struct node* node,  FILE* DumpFile) {
     assert(node != nullptr);
     assert(DumpFile != nullptr);
 
-
-    if (node->value->type == OP_TYPE) {
+    if (IS_OP) {
         char *op = GetOpName(node->value->op);
         dumpPrint("struct%p [\nlabel = \"{op: %s |parent: %p| left: %p| right: %p }\", style = \"filled\", color = \"black\", fillcolor = \"lightgrey\" \n];\n", node, op, node->parent, node->left, node->right);
-    } else if (node->value->type == VAL_TYPE) {
+    } else if (IS_VAL) {
         dumpPrint("struct%p [\nlabel = \"{value: %lf |parent: %p| left: %p| right: %p }\", style = \"filled\", color = \"black\", fillcolor = \"green\" \n];\n", node, node->value->dbl, node->parent, node->left, node->right);
-    } else if (node->value->type == VAR_TYPE) {
+    } else if (IS_VAR) {
+        //printf("im in var and cur var is %s and type is %d\n", CUR_VAR, CUR_TYPE);
         dumpPrint("struct%p [\nlabel = \"{var: %s |parent: %p| left: %p| right: %p }\", style = \"filled\", color = \"black\", fillcolor = \"cyan\" \n];\n", node, node->value->varValue, node->parent, node->left, node->right);
     }
 
