@@ -1,0 +1,19 @@
+--------------------------------------------------
+log file is opened
+
+0
+0
+RESULT NAME IS graphCode1.png
+0
+0
+RESULT NAME IS graphCode2.png
+0
+0
+RESULT NAME IS graphCode3.png
+0
+0
+RESULT NAME IS graphCode4.png
+
+
+log file is closed
+--------------------------------------------------
