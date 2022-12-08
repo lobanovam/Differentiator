@@ -1,0 +1,47 @@
+digraph {
+graph [dpi = 100]rankdir = TB;
+node [ shape=record ];
+struct00000193b3081cd0 [
+label = "{op: + |parent: 0000000000000000| left: 00000193b3081a40| right: 00000193b3081d00 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081a40 [
+label = "{op: cos |parent: 00000193b3081cd0| left: 00000193b30819e0| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081cd0 -> struct00000193b3081a40 [weight=900 constraint=true color=red];
+struct00000193b30819e0 [
+label = "{op: ^ |parent: 00000193b3081a40| left: 00000193b3081920| right: 00000193b3081980 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081a40 -> struct00000193b30819e0 [weight=900 constraint=true color=red];
+struct00000193b3081920 [
+label = "{var: x |parent: 00000193b30819e0| left: 0000000000000000| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "cyan" 
+];
+struct00000193b30819e0 -> struct00000193b3081920 [weight=900 constraint=true color=red];
+struct00000193b3081980 [
+label = "{value: 3.000000 |parent: 00000193b30819e0| left: 0000000000000000| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "green" 
+];
+struct00000193b30819e0 -> struct00000193b3081980 [weight=900 constraint=true color=red];
+struct00000193b3081d00 [
+label = "{op: ^ |parent: 00000193b3081cd0| left: 00000193b3081d90| right: 00000193b3081be0 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081cd0 -> struct00000193b3081d00 [weight=900 constraint=true color=red];
+struct00000193b3081d90 [
+label = "{op: sin |parent: 00000193b3081d00| left: 00000193b3081c70| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081d00 -> struct00000193b3081d90 [weight=900 constraint=true color=red];
+struct00000193b3081c70 [
+label = "{op: * |parent: 00000193b3081d90| left: 00000193b3081c10| right: 00000193b3081d60 }", style = "filled", color = "black", fillcolor = "lightgrey" 
+];
+struct00000193b3081d90 -> struct00000193b3081c70 [weight=900 constraint=true color=red];
+struct00000193b3081c10 [
+label = "{value: 15.000000 |parent: 00000193b3081c70| left: 0000000000000000| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "green" 
+];
+struct00000193b3081c70 -> struct00000193b3081c10 [weight=900 constraint=true color=red];
+struct00000193b3081d60 [
+label = "{var: x |parent: 00000193b3081c70| left: 0000000000000000| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "cyan" 
+];
+struct00000193b3081c70 -> struct00000193b3081d60 [weight=900 constraint=true color=red];
+struct00000193b3081be0 [
+label = "{value: 2.000000 |parent: 00000193b3081d00| left: 0000000000000000| right: 0000000000000000 }", style = "filled", color = "black", fillcolor = "green" 
+];
+struct00000193b3081d00 -> struct00000193b3081be0 [weight=900 constraint=true color=red];
+}

@@ -1,13 +1,16 @@
 #ifndef TEX_H_INCLUDED
 #define TEX_H_INCLUDED
 
-const char* TEX_START =   "\\documentclass[a4paper, 12pt]{article}\n"
+const char* TEX_START =     "\\documentclass[a4paper, 12pt]{article}\n"
+                            "\\usepackage{cmap}\n"
+                            "\\usepackage{graphicx}\n"
+                            "\\usepackage{epstopdf}\n"
                             "\\usepackage[a4paper,top=1.5cm, bottom=1.5cm, left=1cm, right=1cm]"
                             "{geometry}\n"
-                            "\\usepackage[utf8]{inputenc}\n"
+                            "\\usepackage[cp1251]{inputenc}\n"
                             "\\usepackage{mathtext} \n"
                             "\\usepackage[english, russian]{babel} \n"
-                            "\\title{Очко себе продифференцируй, дебил}\n"
+                            "\\title{Очко себе продифференцируй, дебил!}\n"
                             "\\author{Саня, Б01-206}\n"
                             "\\date{\\today}\n";
 

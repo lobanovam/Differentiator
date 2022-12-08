@@ -7,6 +7,7 @@
 #include "dump.h"
 #include "html.h"
 #include "tex.h"
+#include "plot.h"
 
 
 #define dL Diff(node->left)
@@ -93,15 +94,22 @@ double CalculateValue(int OP, double val1, double val2);
 void replaceNodes(struct node* node, struct node* newNode);
 
 int CalcTreeHeight(struct node* node, int curHeight);
-void PrintTex(struct node* node);
 
+void PrintTex(struct node* node);
 void recursTex(struct node* node);
 void TexUnOp(struct node* node);
 void TexCalcOp(struct node* node);
 
-void SubstituteX(struct node* node, double value);
+void PrintPlot(struct node* node, double leftX, double rightX);
+void recursPlot(struct node* node);
+void TexUnOp(struct node* node);
+void TexCalcOp(struct node* node);
 
-char *TEX_COMMANDS[30] = {
+void SubstituteX(struct node* node, double value);
+void freeSubTree(struct node* node);
+void freeNode(struct node* node);
+
+char *TEX_COMMANDS[50] = {
     "\\sin{",
     "\\cos{",                            //DONT CHANGE THE ORDER, ESSENTIAL FOR PRINT TEX
     "\\tg{", 
@@ -110,6 +118,18 @@ char *TEX_COMMANDS[30] = {
     "-{",
     "\\cdot{",
     "^{"
+};
+
+char *PLOT_COMMANDS[50] = {
+    "np.sin(",
+    "np.cos(",
+    "np.tg(",
+    "np.ctg(",                           //DONT CHANGE THE ORDER, ESSENTIAL FOR PRINT PLOT
+    "+",
+    "-",
+    "*",
+    "**",
+    "/"
 };
 
 
@@ -163,24 +183,43 @@ int main() {
     readDiffData(&tree);
     printf("done reading tree\n\n");
 
+    PrintPlot(tree.root, -10, 10);
     PrintTex(tree.root);
 
     TreeDtor(&tree);
     printf("done dtoring tree\n");
 }
 
+void freeNode(struct node* node) {
+    assert(node != NULL);
+
+    free(node->value);
+    logprint("done free node->value\n");
+    free(node);
+    logprint("done freeNode\n\n");
+}
+
+void freeSubTree(struct node* node) {
+    assert(node != NULL);
+
+    if (node->left)  freeSubTree(node->left);
+    if (node->right) freeSubTree(node->right);
+
+    //freeNode(node);
+}
+
 void SubstituteX(struct node* node, double value) {
     if (IS_VAR) {
         struct node* valNode = VAL(value);
         replaceNodes(node, valNode);
-        //free(node)
+        //freeNode(node);
     }
     if (node->left) SubstituteX(node->left, value);
     if (node->right) SubstituteX(node->right, value);
 }
 
 void TexUnOp(struct node* node) {
-    texPr(TEX_COMMANDS[node->value->op]);
+    texPr(TEX_COMMANDS[CUR_OP]);
     if (node->left->left)
         texPr("(");
     recursTex(node->left);
@@ -191,14 +230,71 @@ void TexUnOp(struct node* node) {
 
 void TexCalcOp(struct node* node) {
     recursTex(node->left);
-    texPr(TEX_COMMANDS[node->value->op]);
+    texPr(TEX_COMMANDS[CUR_OP]);
     recursTex(node->right);
     texPr("}");
 }
 
-void recursTex(struct node* node) {
+void PlotUnOp(struct node* node) {
+    logprint("enter in PlotUnOp, cur op is %d\n", CUR_OP);
+    PlotPr(PLOT_COMMANDS[CUR_OP]);
+    logprint("in PlotUnOp output is %s\n", PLOT_COMMANDS[CUR_OP]);
+    recursPlot(node->left);
+    PlotPr(")\n");
+}
 
+void PlotCalcOp(struct node* node) {
+    recursPlot(node->left);
+    PlotPr(PLOT_COMMANDS[CUR_OP]);
+    logprint("in PlotCalcOp output is %s\n", PLOT_COMMANDS[CUR_OP]);
+    PlotPr("(");
+    recursPlot(node->right);
+    PlotPr(")");
+}
+
+void PrintPlot(struct node* node, double leftX, double rightX) {
+    PlotFile = openPlot();
+    PlotPr("import numpy as np\n");
+    PlotPr("import matplotlib.pyplot as plt\n");
+    PlotPr("x = np.linspace(%lf, %lf, 200)\n", leftX, rightX);
+    PlotPr("y = ");
+    recursPlot(node);
+    PlotPr("\n");
+    logprint("done recurs node\n");
+
+    PlotPr("plt.figure(figsize=(8,6), dpi=100)\n");
+    PlotPr("plt.grid(True, linestyle=\"--\")\n");
+    PlotPr("plt.axis([%lf, %lf, np.min(y)-0.25, np.max(y)+0.25])\n", leftX, rightX);
+    PlotPr("plt.plot(x, y, \"-m\",linewidth=1)\n");
+    PlotPr("plt.savefig('graphFunc.png')");
+
+    system("py plot.py");
+
+    ClosePlot(PlotFile);
+}
+
+void recursPlot(struct node* node) {
     if (IS_OP) {
+        if (IS_UN) {
+            logprint("in plot op is UN\n");
+            PlotUnOp(node);
+        } else { 
+            logprint("in plot op NOT is un\n");
+            PlotCalcOp(node);
+        }
+    } else if (IS_VAL) {
+        logprint("in plot is VAL\n");
+        if (CUR_VAL < 0.0) PlotPr("(");
+        PlotPr("%.1lf", CUR_VAL);
+        if (CUR_VAL < 0.0) PlotPr(")");
+    } else if (IS_VAR) {
+        logprint("in plot is VAR\n");
+        PlotPr("%s", CUR_VAR);
+    }
+}
+
+void recursTex(struct node* node) {
+     if (IS_OP) {
         if (IS_UN)
             TexUnOp(node);
         else if (CUR_OP == OP_DIV) {
@@ -211,7 +307,7 @@ void recursTex(struct node* node) {
             TexCalcOp(node);
     } else if (IS_VAL) {
         if (CUR_VAL < 0.0) texPr("(");
-        texPr("%.1lf", CUR_VAL);
+        texPr("%lg", CUR_VAL);
         if (CUR_VAL < 0.0) texPr(")");
     } else if (IS_VAR) {
         texPr("%s", CUR_VAR);
@@ -222,6 +318,7 @@ void PrintTex(struct node* node) {
     texFile = openTex();
 
     OptimizeTree(&node);
+    logprint("**original node is optimized**\n");
     GraphTreeDump(node);
 
     struct node* origin = CopyNode(node);
@@ -231,10 +328,10 @@ void PrintTex(struct node* node) {
     texPr("\\section{Функция}");
     texPr("Давай взглянем, что же ты там приготовил в этот раз.");
 
-    texPr("\\begin{equation}\n");
+    texPr("$ ");
     texPr("f(x) = ");
     recursTex(origin);
-    texPr("\\end{equation}\n");
+    texPr(" $\n");
     texPr("\\par\n");
 
     texPr("Знаешь, я буду с тобой абсолютно честен. Я вот смотрю на эту функцию, и у меня какая-то агрессия, зубы скрипят...\n");
@@ -250,14 +347,17 @@ void PrintTex(struct node* node) {
 
     for (int i = 1; i <= n; i++) {
         struct node* diff = Diff(node);
-
-        OptimizeTree(&diff);
         //GraphTreeDump(diff);
-        texPr("%s\n", FUNNY_WORDS[i-1]);
-        texPr("\\begin{equation}\n");
+
+        logprint("\n**trying to optimize %d diff**\n", i);
+        OptimizeTree(&diff);
+        logprint("**%d th diff is optimized**\n\n", i);
+        
+        texPr("%s\\par \n", FUNNY_WORDS[i-1]);
+        texPr("$");
         texPr("f^{(%d)}(x) = ", i);
         recursTex(diff);
-        texPr("\\end{equation}\n");
+        texPr("$\n");
         texPr("\\par\n");
 
         SubstituteX(diff, 0);  
@@ -282,54 +382,64 @@ void PrintTex(struct node* node) {
 
     SubstituteX(origin, 0);
 
-    texPr("\\begin{equation}\n");
+    texPr("$ ");
     texPr("f(0) = ");
     recursTex(origin);
-    texPr("\\end{equation}\n");
+    texPr("$\n");
     texPr("\\par\n");
 
-    texPr("Калькулируем в уме за 3 наносек: \n");
+    texPr("Калькулируем в уме за 3 наносек:\\par \n");
     OptimizeTree(&origin);
     dirVals[0] = origin->value->dbl;
 
-    texPr("\\begin{equation}\n");
+    texPr("$ ");
     texPr("f(0) = ");
     recursTex(origin);
-    texPr("\\end{equation}\n");
+    texPr("$\n");
     texPr("\\par\n");
 
     texPr("Теперь подставляем x = 0 во все %d производных. \\par\n", n);
     texPr("И да, я уже понял, что ты не сильно сообразительнее вон того кирпича, поэтому вот тебе сразу готовые значения:\\par\n");
 
     for (int i = 1; i <= n; i++) {
-        texPr("$f^{(%d)}(0) = %.1lf$\\par\n", i, dirVals[i]);
+        texPr("$f^{(%d)}(0) = %lg$\\par\n", i, dirVals[i]);
     }
     texPr("\\par\n");
 
     texPr("Ну всё, теперь всё готово для разложения f(x) в Маклорена\\par\n");
-    texPr("\\begin{equation}\n");
+    texPr("$");
     recursTex(origin1);
-    texPr(" = %.1lf ", dirVals[0]);
+    texPr(" = %lg ", dirVals[0]);
     for (int i = 1; i <= n; i++) {
-        texPr(" + \\frac{%.1lf \\cdot x^{%d}}{%d!}", dirVals[i], i, i);
+        texPr(" + \\frac{%lg \\cdot x^{%d}}{%d!}", dirVals[i], i, i);
     }
     texPr(" +o(x^{%d})", n);
-    texPr("\\end{equation}\n");
+    texPr("$\n");
 
-    texPr("Ладно, давай по старой дружбе приведу в божеский вид, чтобы ты, бедняжка, в трёх циферках не запутался.\n");
-    texPr("\\begin{equation}\n");
+    texPr("Ладно, давай по старой дружбе приведу в божеский вид, чтобы ты, бедняжка, в трёх циферках не запутался.\\par\n");
+    texPr("$");
     recursTex(origin1);
-    texPr(" = %.1lf ", dirVals[0]);
+    texPr(" = %lg ", dirVals[0]);
     for (int i = 1; i <= n; i++) {
         if (dirVals[i] != 0)
-            texPr(" + \\frac{%.1lf \\cdot x^{%d}}{%d!}", dirVals[i], i, i);
+            texPr(" + \\frac{%lg \\cdot x^{%d}}{%d!}", dirVals[i], i, i);
     }
     texPr(" +o(x^{%d})", n);
-    texPr("\\end{equation}\n");
+    texPr("$\n");
+    texPr("\\par");
 
     logprint("done recurs tex\n");
+
+    texPr("\\section{Ну что, давай взглянем на эту чушь}\n");
+    texPr("\\begin{center}\n");
+    texPr("\\includegraphics{graphFunc.png}\n");
+    texPr("\\end{center}\n");
+    texPr("\\par");
+    texPr("Ну всё, бездарь, на этом мои полномочия всё. Надеюсь, мы никогда больше не увидимся. Всего плохого.");
+
     CloseTex(texFile);
 
+    system("pdflatex texFile.tex");
 }
 
 void replaceNodes(struct node* node, struct node* newNode) {
@@ -350,6 +460,7 @@ void OptimizeTree(struct node** node_ptr) {
     while (height > 0) {
         height--;
         RecursiveOptimize(node);
+        //GraphTreeDump(node);
     }
 
     logprint("done recursive optimize\n");
@@ -396,6 +507,9 @@ void RecursiveOptimize(struct node* node) {
                 double res = CalculateValue(CUR_OP, L_VAL, 0);
                 struct node* valNode = VAL(res);
                 replaceNodes(node, valNode);
+
+                logprint("free on %d\n", __LINE__);
+                //freeNode(node);
                 return;
             }
             else RecursiveOptimize(node->left);
@@ -405,9 +519,10 @@ void RecursiveOptimize(struct node* node) {
 
                 double res = CalculateValue(CUR_OP, L_VAL, R_VAL);
                 struct node* valNode = VAL(res);
-
                 replaceNodes(node, valNode);
-                //add free
+
+                logprint("free on %d\n", __LINE__);
+                //freeNode(node);
                 node = valNode;
                 return ;
             }
@@ -416,7 +531,9 @@ void RecursiveOptimize(struct node* node) {
 
                 struct node* nullNode = VAL(0.0);
                 replaceNodes(node, nullNode);
-                //add recursive free func
+
+                logprint("free on %d\n", __LINE__);
+                //freeSubTree(node);
                 node = nullNode;
                 return;
             }
@@ -425,6 +542,10 @@ void RecursiveOptimize(struct node* node) {
                 IS_VAL_R && R_VAL == 0.0 && (CUR_OP == OP_ADD || CUR_OP == OP_SUB                   )) {
 
                 replaceNodes(node, node->left);
+                
+                logprint("free on %d\n", __LINE__);
+                logprint("cur node->right->value->dbl = %lf\n", node->right->value->dbl);
+                //freeNode(node->right);
                 node = node->left;
                 RecursiveOptimize(node);
             } 
@@ -433,6 +554,9 @@ void RecursiveOptimize(struct node* node) {
                 IS_VAL_L && L_VAL == 0.0 && CUR_OP == OP_ADD) {
 
                 replaceNodes(node, node->right);
+
+                logprint("free on %d\n", __LINE__);
+                //freeNode(node->left);
                 node = node->right;
                 RecursiveOptimize(node);
             }
@@ -880,7 +1004,6 @@ int CalcTreeHeight(struct node* node, int curHeight) {
         r_height = CalcTreeHeight(node->right, curHeight + 1);
 
     return (l_height>r_height?l_height:r_height);
-
 }
 
 
